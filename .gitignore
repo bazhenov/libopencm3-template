@@ -4,4 +4,6 @@ bin
 *.hex
 *.o
 *.d
+*.lss
+*.list
 generated.*.ld

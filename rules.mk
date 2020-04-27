@@ -45,12 +45,7 @@ Q	:= @
 NULL	:= 2>/dev/null
 endif
 
-# Tool paths.
-PREFIX	?= arm-none-eabi-
-CC	= $(PREFIX)gcc
-LD	= $(PREFIX)gcc
-OBJCOPY	= $(PREFIX)objcopy
-OBJDUMP	= $(PREFIX)objdump
+include $(OPENCM3_DIR)/mk/gcc-config.mk
 OOCD	?= openocd
 
 OPENCM3_INC = $(OPENCM3_DIR)/include
@@ -115,6 +110,7 @@ include $(OPENCM3_DIR)/mk/genlink-config.mk
 
 all: $(PROJECT).elf $(PROJECT).bin
 flash: $(PROJECT).flash
+st-flash: $(PROJECT).st-flash
 
 # error if not using linker script generator
 ifeq (,$(DEVICE))
@@ -175,7 +171,10 @@ endif
 clean:
 	rm -rf $(BUILD_DIR) $(GENERATED_BINS)
 
-.PHONY: all clean flash
+%.st-flash: %.bin
+	st-flash --reset write $< 0x8000000
+
+.PHONY: all clean flash st-flash
 -include $(OBJS:.o=.d)
 
 include $(OPENCM3_DIR)/mk/genlink-rules.mk

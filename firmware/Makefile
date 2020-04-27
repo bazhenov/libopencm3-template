@@ -1,4 +1,4 @@
-PROJECT = awesomesauce
+PROJECT = firmware
 BUILD_DIR = bin
 
 OPENCM3_DIR=../libopencm3
@@ -20,6 +20,3 @@ OOCD_FILE = board/stm32f4discovery.cfg
 
 # You shouldn't have to edit anything below here.
 include ../rules.mk
-
-st-flash: awesomesauce.bin
-	st-flash --reset write $< 0x8000000
