@@ -1,5 +1,7 @@
-#include "api.h"
-#include "api-asm.h"
+extern "C" {
+	#include "api.h"
+	#include "api-asm.h"
+}
 
 int main(void) {
 	/* add your own code */
