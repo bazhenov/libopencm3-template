@@ -31,7 +31,7 @@
 
 VPATH += $(SHARED_DIR) $(FREERTOS_DIR)
 INCLUDES += $(patsubst %,-I%, . $(SHARED_DIR))
-INCLUDES += $(patsubst %,-I%, . $(FREERTOS_DIR))
+INCLUDES += $(patsubst %,-I%, . $(FREERTOS_DIR)/include)
 
 BUILD_DIR ?= bin
 OPT ?= -Os
