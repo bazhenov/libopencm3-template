@@ -7,11 +7,11 @@
 #include <FreeRTOSConfig.h>
 #include <FreeRTOS.h>
 #include <task.h>
-#include "lis3dsh.h"
-#include "usbcdc.h"{}
+#include <lis3dsh.h>
+#include <usbcdc.h>
 
 static void systick_setup(void) {
-	rcc_clock_setup_hse_3v3(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
+	rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 	/* clock rate / 1000 to get 1mS interrupt rate */
 	systick_set_reload(168000);
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
@@ -41,7 +41,7 @@ static void spi_setup() {
 	spi_enable(SPI1);
 }
 
-static void led_task(void *args) {
+static void led_task(void *) {
   for (;;) {
     gpio_toggle(GPIOD, GPIO12);
     vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -55,28 +55,33 @@ static void led_task(void *args) {
   }
 }
 
-static void task_accel(void *args) {
-	lis3dsh acc(SPI1);
+static void task_accel(void *arg) {
+	lis3dsh *acc = reinterpret_cast<lis3dsh*>(arg);
 
-	uint8_t hello = acc.readRegister(LIS3DSH_REG_WHO_AM_I);
+	if ( acc->readRegister(LIS3DSH_REG_WHO_AM_I) != 0x3F ) {
+		// Incorrect register value reporting error
+		for (;;) {
+			gpio_toggle(GPIOD, GPIO13);
+			vTaskDelay(100 / portTICK_PERIOD_MS);
+		}
+	}
 
-	acc.writeRegister(LIS3DSH_REG_CTRL_REG4, LIS3DSH_ODR_POWER_50HZ | LIS3DSH_XYZ_ENABLED);
-	acc.writeRegister(LIS3DSH_REG_CTRL_REG5, LIS3DSH_FSCALE_2G);
+	acc->writeRegister(LIS3DSH_REG_CTRL_REG4, LIS3DSH_ODR_POWER_50HZ | LIS3DSH_XYZ_ENABLED);
+	acc->writeRegister(LIS3DSH_REG_CTRL_REG5, LIS3DSH_FSCALE_2G);
 
 	int16_t xyz[3];
 
 	while (1) {
-		acc.readXyz(xyz);
-		int8_t temp = acc.readRegister(0x0C);
+		acc->readXyz(xyz);
+		int8_t temp = acc->readRegister(0x0C);
 
-		//usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
+		usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
 		gpio_toggle(GPIOD, GPIO13);
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		vTaskDelay(500 / portTICK_PERIOD_MS);
 	}
 }
 
-static void usb_task(void *args) {
-
+static void usb_task(void *) {
 	static char line[128];
 	int pos = 0;
 
@@ -109,8 +114,9 @@ static void usb_task(void *args) {
 
 int main(void) {
 	systick_setup();
-
+	
 	spi_setup();
+	static lis3dsh acc(SPI1);
 
 	usb_vcp_init();
 
@@ -118,8 +124,9 @@ int main(void) {
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO12 | GPIO13);
 	
 	xTaskCreate(led_task, "LED", 100, NULL, configMAX_PRIORITIES - 1, NULL);
-	xTaskCreate(task_accel, "task_accel", 100, NULL, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(usb_task, "usb_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
+	
 	vTaskStartScheduler();
 
 	for (;;);

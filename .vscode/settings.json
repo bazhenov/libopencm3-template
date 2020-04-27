@@ -1,0 +1,10 @@
+{
+  "C_Cpp.default.defines": [
+    "STM32F4"
+  ],
+  "C_Cpp.default.includePath": [
+    "./libopencm3/include",
+    "./freertos/include",
+    "./shared"
+  ]
+}
