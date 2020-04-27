@@ -27,8 +27,11 @@
 # No support for stylecheck.
 # No support for BMP/texane/random flash methods, no plans either
 # No support for magically finding the library.
-# C++ hasn't been actually tested with this..... sorry bout that. ;)
 # Second expansion/secondary not set, add this if you need them.
+
+VPATH += $(SHARED_DIR) $(FREERTOS_DIR)
+INCLUDES += $(patsubst %,-I%, . $(SHARED_DIR))
+INCLUDES += $(patsubst %,-I%, . $(FREERTOS_DIR))
 
 BUILD_DIR ?= bin
 OPT ?= -Os
@@ -55,7 +58,7 @@ OPENCM3_INC = $(OPENCM3_DIR)/include
 # Inclusion of library header files
 INCLUDES += $(patsubst %,-I%, . $(OPENCM3_INC) )
 
-OBJS = $(CFILES:%.c=$(BUILD_DIR)/%.o)
+OBJS += $(CFILES:%.c=$(BUILD_DIR)/%.o)
 OBJS += $(CXXFILES:%.cxx=$(BUILD_DIR)/%.o)
 OBJS += $(AFILES:%.S=$(BUILD_DIR)/%.o)
 GENERATED_BINS = $(PROJECT).elf $(PROJECT).bin $(PROJECT).map $(PROJECT).list $(PROJECT).lss
@@ -101,6 +104,8 @@ LDLIBS += -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
 .SUFFIXES:
 .SUFFIXES: .c .S .h .o .cxx .elf .bin .list .lss
 
+include $(OPENCM3_DIR)/mk/genlink-config.mk
+
 # Bad make, never *ever* try to get a file out of source control by yourself.
 %: %,v
 %: RCS/%,v
@@ -139,7 +144,7 @@ $(BUILD_DIR)/%.o: %.S
 	$(Q)$(CC) $(TGT_ASFLAGS) $(ASFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $@ -c $<
 
 $(PROJECT).elf: $(OBJS) $(LDSCRIPT) $(LIBDEPS)
-	@printf "  LD\t$@\n"
+	@printf "  LD\t$@ -- $(Q)$(LD) $(TGT_LDFLAGS) $(LDFLAGS) $(OBJS) $(LDLIBS) -o $@\n"
 	$(Q)$(LD) $(TGT_LDFLAGS) $(LDFLAGS) $(OBJS) $(LDLIBS) -o $@
 
 %.bin: %.elf
@@ -173,3 +178,4 @@ clean:
 .PHONY: all clean flash
 -include $(OBJS:.o=.d)
 
+include $(OPENCM3_DIR)/mk/genlink-rules.mk
