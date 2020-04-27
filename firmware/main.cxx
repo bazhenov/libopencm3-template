@@ -3,10 +3,12 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/spi.h>
 #include <libopencm3/usb/usbd.h>
+#include <cstring>
+#include <FreeRTOSConfig.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include "lis3dsh.h"
-#include "usbcdc.h"
+#include "usbcdc.h"{}
 
 static void systick_setup(void) {
 	rcc_clock_setup_hse_3v3(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
@@ -67,9 +69,41 @@ static void task_accel(void *args) {
 		acc.readXyz(xyz);
 		int8_t temp = acc.readRegister(0x0C);
 
-		usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
+		//usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
 		gpio_toggle(GPIOD, GPIO13);
-		vTaskDelay(100 / portTICK_PERIOD_MS);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+
+static void usb_task(void *args) {
+
+	static char line[128];
+	int pos = 0;
+
+	for (;;) {
+		vTaskDelay(1 / portTICK_PERIOD_MS);
+
+		while ( usb_vcp_avail() > 0 ) {
+			char next_char = usb_vcp_recv_byte();
+			usb_vcp_printf("%c", next_char);
+			if ( next_char == '\r' ) {
+				line[pos] = 0;
+				usb_vcp_printf("\n");
+
+				if ( strcmp(line, "hello") == 0 ) {
+					usb_vcp_printf("Hello to you too\n");
+				} else if ( strcmp(line, "top") == 0 ) {
+					
+				} else {
+					usb_vcp_printf("Unknown command: %s\n", line);
+				}
+				usb_vcp_printf("> ");
+
+				pos = 0;
+			} else {
+				line[pos++] = next_char;
+			}
+		}
 	}
 }
 
@@ -85,6 +119,7 @@ int main(void) {
 	
 	xTaskCreate(led_task, "LED", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(task_accel, "task_accel", 100, NULL, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(usb_task, "usb_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	vTaskStartScheduler();
 
 	for (;;);
