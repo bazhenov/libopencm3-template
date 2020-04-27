@@ -1,7 +1,7 @@
 PROJECT = awesomesauce
 BUILD_DIR = bin
 
-SHARED_DIR = ../my-common-code
+SHARED_DIR = ../shared
 CFILES += api.c
 CXXFILES += my-project.cxx
 AFILES += api-asm.S
