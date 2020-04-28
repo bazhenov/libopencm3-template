@@ -12,7 +12,7 @@ OBJS += $(FREERTOS_DIR)/heap_4.o \
 	$(FREERTOS_DIR)/port.o
 
 CFILES += StrPrintf.c
-CXXFILES += usbcdc.cxx main.cxx lis3dsh.cxx hd44780.cxx
+CXXFILES += usbcdc.cxx main.cxx lis3dsh.cxx
 
 # TODO - you will need to edit these two lines!
 DEVICE=stm32f407vgt6

@@ -11,6 +11,13 @@
 #include <hd44780.h>
 #include <usbcdc.h>
 
+pin_t rs = {GPIOE, GPIO0};
+pin_t rw = {GPIOE, GPIO1};
+pin_t e = {GPIOE, GPIO2};
+pin_t db0 = {GPIOA, GPIO0};
+
+using BoundHd44780 = Hd44780<rs, rw, e, db0>;
+
 static void systick_setup(void) {
 	rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 	/* clock rate / 1000 to get 1mS interrupt rate */
@@ -114,7 +121,17 @@ static void usb_task(void *) {
 }
 
 static void lcd_task(void *) {
-	Hd44780 led;
+	BoundHd44780 lcd;
+
+	lcd.print("Hello to you! Yay!!");
+	lcd.print("Hello to you! Yay!!");
+	lcd.print("Hello to you! Yay!!");
+	lcd.print("Hello to you! Yay!!");
+	lcd.print("Hello to you! Yay!!");
+
+	lcd.clear();
+
+	lcd.print("Yep!");
 
 	for(;;);
 }
@@ -126,15 +143,15 @@ int main(void) {
 	rcc_periph_clock_enable(RCC_GPIOE);
 	rcc_periph_clock_enable(RCC_GPIOA);
 
-	spi_setup();
-	static lis3dsh acc(SPI1);
+	//spi_setup();
+	//static lis3dsh acc(SPI1);
 
 	usb_vcp_init();
 
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO12 | GPIO13);
 	
 	xTaskCreate(led_task, "LED", 100, NULL, configMAX_PRIORITIES - 1, NULL);
-	xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
+	//xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(usb_task, "usb_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(lcd_task, "lcd_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	

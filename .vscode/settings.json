@@ -6,5 +6,8 @@
     "./libopencm3/include",
     "./freertos/include",
     "./shared"
-  ]
+  ],
+  "files.associations": {
+    "*.tcc": "cpp"
+  }
 }
