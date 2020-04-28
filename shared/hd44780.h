@@ -136,21 +136,20 @@ class Hd44780 {
       writeInstruction(LCD_DISPLAYCONTROL | this->displayControl);
     }
 
+    void write_db(uint8_t db) {
+      gpio_clear(DB0.port, this->db_pins);
+      for (uint16_t gpio=DB0.pin; gpio <= DB0.pin << 7; gpio <<= 1) {
+        if (db & 1) 
+          gpio_set(DB0.port, gpio);
+        db >>= 1;
+      }
+    }
+
     template<bool wait_for_busyflag = true>
     void writeInstruction(uint8_t db) { 
       gpio_clear(RS.port, RS.pin);
       gpio_clear(RW.port, RW.pin);
-
-      gpio_mode_setup(DB0.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, DB0.pin << 7);
-      gpio_set_output_options(DB0.port, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, DB0.pin << 7);
-      for (uint16_t gpio=DB0.pin; gpio <= DB0.pin << 7; gpio <<= 1) {
-        if (db & 1) 
-          gpio_set(DB0.port, gpio);
-        else
-          gpio_clear(DB0.port, gpio);
-         db >>= 1;
-      }
-
+      this->write_db(db);
       strobe();
 
       if ( wait_for_busyflag )
@@ -160,14 +159,7 @@ class Hd44780 {
     void writeData(uint8_t db) { 
       gpio_set(RS.port, RS.pin);
       gpio_clear(RW.port, RW.pin);
-
-      gpio_clear(DB0.port, this->db_pins);
-      for (uint16_t gpio=DB0.pin; gpio <= DB0.pin << 7; gpio <<= 1) {
-        if (db & 1) 
-          gpio_set(DB0.port, gpio);
-        db >>= 1;
-      }
-
+      this->write_db(db);
       strobe();
       wait_for_busy();
     }

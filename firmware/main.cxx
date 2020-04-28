@@ -11,6 +11,10 @@
 #include <hd44780.h>
 #include <usbcdc.h>
 
+extern "C" {
+	#include <StrPrintf.h>
+}
+
 pin_t rs = {GPIOE, GPIO0};
 pin_t rw = {GPIOE, GPIO1};
 pin_t e = {GPIOE, GPIO2};
@@ -133,7 +137,13 @@ static void lcd_task(void *) {
 
 	lcd.print("Yep!");
 
-	for(;;);
+	char line[128];
+	for(int i=0; ; i++) {
+		StrPrintf(line, 128, "Hello: %d", i);
+		lcd.clear();
+		lcd.print(line);
+		vTaskDelay(pdMS_TO_TICKS(1000));
+	}
 }
 
 int main(void) {
