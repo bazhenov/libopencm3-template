@@ -8,6 +8,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <lis3dsh.h>
+#include <hd44780.h>
 #include <usbcdc.h>
 
 static void systick_setup(void) {
@@ -62,7 +63,7 @@ static void task_accel(void *arg) {
 		// Incorrect register value reporting error
 		for (;;) {
 			gpio_toggle(GPIOD, GPIO13);
-			vTaskDelay(100 / portTICK_PERIOD_MS);
+			vTaskDelay(pdMS_TO_TICKS(100));
 		}
 	}
 
@@ -77,7 +78,7 @@ static void task_accel(void *arg) {
 
 		usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
 		gpio_toggle(GPIOD, GPIO13);
-		vTaskDelay(500 / portTICK_PERIOD_MS);
+		vTaskDelay(pdMS_TO_TICKS(500));
 	}
 }
 
@@ -86,7 +87,7 @@ static void usb_task(void *) {
 	int pos = 0;
 
 	for (;;) {
-		vTaskDelay(1 / portTICK_PERIOD_MS);
+		vTaskDelay(pdMS_TO_TICKS(1));
 
 		while ( usb_vcp_avail() > 0 ) {
 			char next_char = usb_vcp_recv_byte();
@@ -112,20 +113,30 @@ static void usb_task(void *) {
 	}
 }
 
+static void lcd_task(void *) {
+	Hd44780 led;
+
+	for(;;);
+}
+
 int main(void) {
 	systick_setup();
 	
+	rcc_periph_clock_enable(RCC_GPIOD);
+	rcc_periph_clock_enable(RCC_GPIOE);
+	rcc_periph_clock_enable(RCC_GPIOA);
+
 	spi_setup();
 	static lis3dsh acc(SPI1);
 
 	usb_vcp_init();
 
-	rcc_periph_clock_enable(RCC_GPIOD);
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO12 | GPIO13);
 	
 	xTaskCreate(led_task, "LED", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(usb_task, "usb_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(lcd_task, "lcd_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	
 	vTaskStartScheduler();
 
