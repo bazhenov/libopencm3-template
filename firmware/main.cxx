@@ -18,7 +18,7 @@ extern "C" {
 pin_t rs = {GPIOE, GPIO0};
 pin_t rw = {GPIOE, GPIO1};
 pin_t e = {GPIOE, GPIO2};
-pin_t db0 = {GPIOA, GPIO0};
+pin_t db0 = {GPIOB, GPIO0};
 
 using BoundHd44780 = Hd44780<rs, rw, e, db0>;
 
@@ -69,6 +69,8 @@ static void led_task(void *) {
 
 static void task_accel(void *arg) {
 	lis3dsh *acc = reinterpret_cast<lis3dsh*>(arg);
+	BoundHd44780 lcd;
+	lcd.clear();
 
 	if ( acc->readRegister(LIS3DSH_REG_WHO_AM_I) != 0x3F ) {
 		// Incorrect register value reporting error
@@ -82,14 +84,25 @@ static void task_accel(void *arg) {
 	acc->writeRegister(LIS3DSH_REG_CTRL_REG5, LIS3DSH_FSCALE_2G);
 
 	int16_t xyz[3];
+	char line[128];
 
-	while (1) {
+	lcd.position(0, 1);
+	lcd.print("   X   Y   Z   ");
+
+	for (;;) {
 		acc->readXyz(xyz);
 		int8_t temp = acc->readRegister(0x0C);
 
 		usb_vcp_printf("XYZ: [%10d, %10d, %10d]\n", xyz[0], xyz[1], xyz[2]);
-		gpio_toggle(GPIOD, GPIO13);
-		vTaskDelay(pdMS_TO_TICKS(500));
+
+		StrPrintf(line, 128, "%4d%4d%4d", xyz[0]/100, xyz[1]/100, xyz[2]/100);
+		lcd.position(0, 0);
+		lcd.print(line);
+
+		gpio_set(GPIOD, GPIO13);
+		vTaskDelay(pdMS_TO_TICKS(10));
+		gpio_clear(GPIOD, GPIO13);
+		vTaskDelay(pdMS_TO_TICKS(100));
 	}
 }
 
@@ -124,46 +137,24 @@ static void usb_task(void *) {
 	}
 }
 
-static void lcd_task(void *) {
-	BoundHd44780 lcd;
-
-	lcd.print("Hello to you! Yay!!");
-	lcd.print("Hello to you! Yay!!");
-	lcd.print("Hello to you! Yay!!");
-	lcd.print("Hello to you! Yay!!");
-	lcd.print("Hello to you! Yay!!");
-
-	lcd.clear();
-
-	lcd.print("Yep!");
-
-	char line[128];
-	for(int i=0; ; i++) {
-		StrPrintf(line, 128, "Hello: %d", i);
-		lcd.clear();
-		lcd.print(line);
-		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
-}
-
 int main(void) {
 	systick_setup();
 	
 	rcc_periph_clock_enable(RCC_GPIOD);
 	rcc_periph_clock_enable(RCC_GPIOE);
 	rcc_periph_clock_enable(RCC_GPIOA);
+	rcc_periph_clock_enable(RCC_GPIOB);
 
-	//spi_setup();
-	//static lis3dsh acc(SPI1);
+	spi_setup();
+	static lis3dsh acc(SPI1);
 
 	usb_vcp_init();
 
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO12 | GPIO13);
 	
 	xTaskCreate(led_task, "LED", 100, NULL, configMAX_PRIORITIES - 1, NULL);
-	//xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(task_accel, "task_accel", 100, &acc, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(usb_task, "usb_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
-	xTaskCreate(lcd_task, "lcd_task", 100, NULL, configMAX_PRIORITIES - 1, NULL);
 	
 	vTaskStartScheduler();
 

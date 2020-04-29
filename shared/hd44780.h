@@ -6,17 +6,17 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-#define LCD_CLEARDISPLAY 0x01
+#define INSTRUCTION_CLEARDISPLAY      (1 << 0)
 
-#define LCD_RETURNHOME 0x02
+#define INSTRUCTION_RETURNHOME        (1 << 1)
 
-#define LCD_ENTRYMODESET 0x04
+#define INSTRUCTION_ENTRYMODESET(x)   ((1 << 2) | (x & 0b00000011))
 #define LCD_ENTRYRIGHT 0x00
 #define LCD_ENTRYLEFT 0x02
 #define LCD_ENTRYSHIFTINCREMENT 0x01
 #define LCD_ENTRYSHIFTDECREMENT 0x00
 
-#define LCD_DISPLAYCONTROL 0x08
+#define INSTRUCTION_DISPLAYCONTROL(x) ((1 << 3) | (x & 0b00000111))
 #define LCD_DISPLAYON 0x04
 #define LCD_DISPLAYOFF 0x00
 #define LCD_CURSORON 0x02
@@ -24,17 +24,20 @@
 #define LCD_BLINKON 0x01
 #define LCD_BLINKOFF 0x00
 
-#define LCD_CURSORSHIFT 0x10
-#define LCD_SETCGRAMADDR 0x40
-#define LCD_SETDDRAMADDR 0x80
+#define INSTRUCTION_SHIFT(x)          ((1 << 4) | (x & 0b00001100))
 
-#define LCD_FUNCTIONSET 0x20
+#define INSTRUCTION_FUNCTIONSET(x)    ((1 << 5) | (x & 0b00011100))
 #define LCD_8BITMODE 0x10
 #define LCD_4BITMODE 0x00
 #define LCD_2LINE 0x08
 #define LCD_1LINE 0x00
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
+
+#define INSTRUCTION_SET_CGRAM_ADDR(x) ((1 << 6) | (x & 0b00111111))
+#define INSTRUCTION_SET_DDRAM_ADDR(x) ((1 << 7) | (x & 0b01111111))
+
+#define LCD_COLS 64
 
 typedef struct {
   uint32_t port;
@@ -61,10 +64,10 @@ class Hd44780 {
       pins |= pins << 1;
       pins |= pins << 2;
       pins |= pins << 4;
-      this->db_pins = pins;
+      db_pins = pins;
 
-      gpio_mode_setup(DB0.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, this->db_pins);
-      gpio_set_output_options(DB0.port, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, this->db_pins);
+      gpio_mode_setup(DB0.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, db_pins);
+      gpio_set_output_options(DB0.port, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, db_pins);
 
       // RS pin
       gpio_mode_setup(RS.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, RS.pin);
@@ -81,51 +84,55 @@ class Hd44780 {
       // HD44780U startup sequnce. See datasheet p. 45
       vTaskDelay(pdMS_TO_TICKS(41));
 
-      writeInstruction<false>(LCD_FUNCTIONSET | LCD_8BITMODE);
+      writeInstruction<false>(INSTRUCTION_FUNCTIONSET(LCD_8BITMODE));
       vTaskDelay(pdMS_TO_TICKS(5));
-      writeInstruction<false>(LCD_FUNCTIONSET | LCD_8BITMODE);
+      writeInstruction<false>(INSTRUCTION_FUNCTIONSET(LCD_8BITMODE));
       vTaskDelay(pdMS_TO_TICKS(1));
-      writeInstruction<false>(LCD_FUNCTIONSET | LCD_8BITMODE);
+      writeInstruction<false>(INSTRUCTION_FUNCTIONSET(LCD_8BITMODE));
       vTaskDelay(pdMS_TO_TICKS(1));
-      writeInstruction<false>(LCD_FUNCTIONSET | LCD_8BITMODE | LCD_2LINE | LCD_5x8DOTS);
+      writeInstruction<false>(INSTRUCTION_FUNCTIONSET(LCD_8BITMODE | LCD_2LINE | LCD_5x8DOTS));
       vTaskDelay(pdMS_TO_TICKS(1));
 
-      writeInstruction(LCD_DISPLAYCONTROL | LCD_DISPLAYOFF);
+      writeInstruction(INSTRUCTION_DISPLAYCONTROL(LCD_DISPLAYOFF));
 
-      writeInstruction(LCD_CLEARDISPLAY);
+      writeInstruction(INSTRUCTION_CLEARDISPLAY);
 
-      writeInstruction(LCD_ENTRYMODESET | LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT);
-
+      writeInstruction(INSTRUCTION_ENTRYMODESET(LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT));
+      // HD44780U startup sequnce complete
       
-      this->updateDisplayControl();
+      updateDisplayControl();
     }
 
     void clear() {
-      writeInstruction(LCD_CLEARDISPLAY);
+      writeInstruction(INSTRUCTION_CLEARDISPLAY);
     }
 
     void blink() {
-      this->displayControl |= LCD_BLINKON;
-      this->updateDisplayControl();
+      displayControl |= LCD_BLINKON;
+      updateDisplayControl();
     }
 
     void noBlink() {
-      this->displayControl &= ~LCD_BLINKON;
-      this->updateDisplayControl();
+      displayControl &= ~LCD_BLINKON;
+      updateDisplayControl();
     }
 
     void cursor() {
-      this->displayControl |= LCD_CURSORON;
-      this->updateDisplayControl();
+      displayControl |= LCD_CURSORON;
+      updateDisplayControl();
     }
 
     void noCursor() {
-      this->displayControl &= ~LCD_CURSORON;
-      this->updateDisplayControl();
+      displayControl &= ~LCD_CURSORON;
+      updateDisplayControl();
+    }
+
+    void position(uint8_t col, uint8_t row) {
+      writeInstruction(INSTRUCTION_SET_DDRAM_ADDR(col + LCD_COLS * row));
     }
 
     void print(char *str) {
-      while (*str != '\0') {
+      while (*str) {
         writeData(*str);
         str++;
       }
@@ -133,7 +140,7 @@ class Hd44780 {
   
   private:
     inline void updateDisplayControl() {
-      writeInstruction(LCD_DISPLAYCONTROL | this->displayControl);
+      writeInstruction(INSTRUCTION_DISPLAYCONTROL(this->displayControl));
     }
 
     void write_db(uint8_t db) {
@@ -149,7 +156,7 @@ class Hd44780 {
     void writeInstruction(uint8_t db) { 
       gpio_clear(RS.port, RS.pin);
       gpio_clear(RW.port, RW.pin);
-      this->write_db(db);
+      write_db(db);
       strobe();
 
       if ( wait_for_busyflag )
@@ -159,7 +166,7 @@ class Hd44780 {
     void writeData(uint8_t db) { 
       gpio_set(RS.port, RS.pin);
       gpio_clear(RW.port, RW.pin);
-      this->write_db(db);
+      write_db(db);
       strobe();
       wait_for_busy();
     }
@@ -179,7 +186,7 @@ class Hd44780 {
     static inline void strobe() {
       gpio_set(E.port, E.pin);
       gpio_clear(E.port, E.pin);
-      for (int i=0; i<100; i++) {
+      for (int i=0; i<10; i++) {
         __asm__("nop");
       }
       gpio_set(E.port, E.pin);
